@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "> 5.0.0"
+      version = ">= 5.0.0"
     }
   }
 }
@@ -11,19 +11,21 @@ provider "aws" {
   region = var.aws_region
 }
 
-# -------------------
-# IAM Role for Lambda
-# -------------------
+# ----------------------------------------------------------
+# IAM ROLE for Lambda
+# ----------------------------------------------------------
 resource "aws_iam_role" "lambda_role" {
   name = substr("${var.lambda_name}-role", 0, 64)
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       {
         Action = "sts:AssumeRole"
         Effect = "Allow"
-        Principal = { Service = "lambda.amazonaws.com" }
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
       }
     ]
   })
@@ -34,9 +36,10 @@ resource "aws_iam_role_policy_attachment" "cw_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# DynamoDB Access Policy
 resource "aws_iam_policy" "lambda_dynamo_policy" {
   name        = substr("${var.lambda_name}-dynamodb-policy", 0, 64)
-  description = "Dynamo access for ${var.lambda_name}"
+  description = "DynamoDB access for Lambda"
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -51,7 +54,7 @@ resource "aws_iam_policy" "lambda_dynamo_policy" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem"
         ],
-        Resource = var.table_arn != "" ? [var.table_arn] : ["*"]
+        Resource = var.table_arn != "" ? var.table_arn : "*"
       }
     ]
   })
@@ -62,9 +65,9 @@ resource "aws_iam_role_policy_attachment" "dynamo_attach" {
   policy_arn = aws_iam_policy.lambda_dynamo_policy.arn
 }
 
-# -------------------
-# DynamoDB Table
-# -------------------
+# ----------------------------------------------------------
+# DynamoDB Table (optional)
+# ----------------------------------------------------------
 resource "aws_dynamodb_table" "table" {
   count        = var.create_table ? 1 : 0
   name         = var.table_name
@@ -77,9 +80,9 @@ resource "aws_dynamodb_table" "table" {
   }
 }
 
-# -------------------
+# ----------------------------------------------------------
 # Lambda Function
-# -------------------
+# ----------------------------------------------------------
 resource "aws_lambda_function" "lambda" {
   function_name = var.lambda_name
   filename      = var.package_path
@@ -96,20 +99,24 @@ resource "aws_lambda_function" "lambda" {
   }
 }
 
-# -------------------
-# API Gateway
-# -------------------
+# ----------------------------------------------------------
+# API Gateway REST API
+# ----------------------------------------------------------
 resource "aws_api_gateway_rest_api" "api" {
   name        = "${var.lambda_name}-api"
   description = var.api_description
 }
 
-# Convert endpoints list to map for easy lookup
+# Sanitize path parts (remove "/")
 locals {
-  endpoints_map = { for ep in var.endpoints : ep.path => ep }
+  endpoints_map = {
+    for ep in var.endpoints : ep.path => {
+      path   = replace(ep.path, "/", "")
+      method = ep.method
+    }
+  }
 }
 
-# Create API Gateway resources
 resource "aws_api_gateway_resource" "routes" {
   for_each    = local.endpoints_map
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -117,7 +124,6 @@ resource "aws_api_gateway_resource" "routes" {
   path_part   = each.value.path
 }
 
-# Create methods for each route
 resource "aws_api_gateway_method" "methods" {
   for_each      = aws_api_gateway_resource.routes
   rest_api_id   = aws_api_gateway_rest_api.api.id
@@ -126,43 +132,62 @@ resource "aws_api_gateway_method" "methods" {
   authorization = var.authorization
 }
 
-# Integrate Lambda with each method
 resource "aws_api_gateway_integration" "integrations" {
-  for_each = aws_api_gateway_resource.routes
+  for_each                = aws_api_gateway_resource.routes
   rest_api_id             = aws_api_gateway_rest_api.api.id
   resource_id             = each.value.id
   http_method             = aws_api_gateway_method.methods[each.key].http_method
   type                    = "AWS_PROXY"
   integration_http_method = "POST"
-  uri                     = aws_lambda_function.lambda.invoke_arn
+
+  # Correct API Gateway → Lambda URI
+  uri = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${aws_lambda_function.lambda.arn}/invocations"
 }
 
-# Deployment with triggers (auto re-deploy when integrations change)
+# ----------------------------------------------------------
+# Lambda Permission (REQUIRED for trigger)
+# ----------------------------------------------------------
+resource "aws_lambda_permission" "apigw_invoke" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+}
+
+# ----------------------------------------------------------
+# Deployment
+# ----------------------------------------------------------
 resource "aws_api_gateway_deployment" "deployment" {
   rest_api_id = aws_api_gateway_rest_api.api.id
+
+  triggers = {
+    redeploy = sha1(join(",", [
+      for i in aws_api_gateway_integration.integrations : i.id
+    ]))
+  }
 
   lifecycle {
     create_before_destroy = true
   }
-
-  triggers = {
-    redeploy = sha1(join(",", [for i in aws_api_gateway_integration.integrations : i.id]))
-  }
 }
 
-# Stage
 resource "aws_api_gateway_stage" "stage" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   stage_name    = var.stage_name
   deployment_id = aws_api_gateway_deployment.deployment.id
 }
 
-# -------------------
-# Local URLs
-# -------------------
+# ----------------------------------------------------------
+# Output API URLs
+# ----------------------------------------------------------
 locals {
   api_invoke_urls = {
     for ep in var.endpoints :
-    ep.path => "https://${aws_api_gateway_rest_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.stage.stage_name}/${ep.path}"
+    ep.path => "https://${aws_api_gateway_rest_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${var.stage_name}/${replace(ep.path, "/", "")}"
   }
+}
+
+output "api_urls" {
+  value = local.api_invoke_urls
 }

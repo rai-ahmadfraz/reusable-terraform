@@ -5,22 +5,23 @@ provider "aws" {
 }
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../lambda"
-  output_path = "${path.module}/../lambda/lambda.zip"
+  source_dir  = "${path.module}/../example/lambda"
+  output_path = "${path.module}/../example/lambda.zip"
   excludes = [
     "**/node_modules/*",
     "**/*.log",
     "**/.terraform/*",
+    "**/*.zip"
   ]
 }
 module "serverless_app" {
   source = "../lambda-api"
 
-  lambda_name   = "sample-function2"
+  lambda_name   = "sample-function9"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   package_path  = data.archive_file.lambda_zip.output_path
-  table_name    = "sample-table2"
+  table_name    = "sample-table9"
   partition_key = "id"
   aws_region    = var.aws_region
 
