@@ -47,6 +47,9 @@ resource "aws_dynamodb_table" "tables" {
     name = var.partition_key
     type = "S"
   }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_iam_policy" "lambda_dynamo_policy" {
