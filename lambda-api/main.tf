@@ -35,7 +35,7 @@ resource "aws_iam_role_policy_attachment" "cw_logs" {
 }
 
 # ----------------------------------------------------------
-# DYNAMODB TABLES (multi-table support)
+# DYNAMODB TABLES (multi-table support, auto-delete removed)
 # ----------------------------------------------------------
 resource "aws_dynamodb_table" "tables" {
   for_each     = var.enable_dynamo ? { for t in var.table_names : t => t } : {}

@@ -39,11 +39,6 @@ variable "table_names" {
   default = []
 }
 
-variable "table_arns" {
-  type    = list(string)
-  default = []
-}
-
 variable "partition_key" {
   type    = string
   default = "id"
