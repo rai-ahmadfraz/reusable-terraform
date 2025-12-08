@@ -50,7 +50,7 @@ resource "aws_dynamodb_table" "tables" {
 }
 
 resource "aws_iam_policy" "lambda_dynamo_policy" {
-  count       = var.enable_dynamo ? 1 : 0
+  count       = var.enable_dynamo && length(var.table_names) > 0 ? 1 : 0
   name        = substr("${var.lambda_name}-dynamodb-policy", 0, 64)
   description = "DynamoDB access for Lambda"
 
@@ -67,14 +67,14 @@ resource "aws_iam_policy" "lambda_dynamo_policy" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem"
         ],
-        Resource = var.table_arns != [] ? var.table_arns : [for t in aws_dynamodb_table.tables : t.arn]
+        Resource = [for t in aws_dynamodb_table.tables : t.arn]
       }
     ]
   })
 }
 
 resource "aws_iam_role_policy_attachment" "dynamo_attach" {
-  count      = var.enable_dynamo ? 1 : 0
+  count      = var.enable_dynamo && length(var.table_names) > 0 ? 1 : 0
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_dynamo_policy[0].arn
 }

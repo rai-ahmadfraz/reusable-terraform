@@ -20,7 +20,7 @@ module "serverless_app" {
   aws_region    = var.aws_region
 
   enable_dynamo  = true
-  table_names    = ["room", "ambient", "new_table"]
+  table_names    = ["room", "ambient"]
 
   enable_api     = true
   endpoints = [
