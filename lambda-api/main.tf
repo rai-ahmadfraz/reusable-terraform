@@ -38,7 +38,7 @@ resource "aws_iam_role_policy_attachment" "cw_logs" {
 # DYNAMODB TABLES (multi-table support)
 # ----------------------------------------------------------
 resource "aws_dynamodb_table" "tables" {
-  for_each     = var.enable_dynamo && var.create_tables ? { for t in var.table_names : t => t } : {}
+  for_each     = var.enable_dynamo ? { for t in var.table_names : t => t } : {}
   name         = each.value
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = var.partition_key

@@ -34,11 +34,6 @@ variable "enable_dynamo" {
 # ------------------------
 # DYNAMODB
 # ------------------------
-variable "create_tables" {
-  type    = bool
-  default = true
-}
-
 variable "table_names" {
   type    = list(string)
   default = []
