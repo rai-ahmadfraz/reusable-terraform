@@ -34,16 +34,19 @@ variable "enable_dynamo" {
 # ------------------------
 # DYNAMODB
 # ------------------------
-variable "create_table" {
+variable "create_tables" {
   type    = bool
   default = true
 }
 
-variable "table_name" { type = string }
+variable "table_names" {
+  type    = list(string)
+  default = []
+}
 
-variable "table_arn" {
-  type    = string
-  default = ""
+variable "table_arns" {
+  type    = list(string)
+  default = []
 }
 
 variable "partition_key" {

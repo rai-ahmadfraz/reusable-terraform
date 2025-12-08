@@ -35,12 +35,11 @@ resource "aws_iam_role_policy_attachment" "cw_logs" {
 }
 
 # ----------------------------------------------------------
-# OPTIONAL: DYNAMODB
+# DYNAMODB TABLES (multi-table support)
 # ----------------------------------------------------------
-
-resource "aws_dynamodb_table" "table" {
-  count        = var.enable_dynamo && var.create_table ? 1 : 0
-  name         = var.table_name
+resource "aws_dynamodb_table" "tables" {
+  for_each     = var.enable_dynamo && var.create_tables ? { for t in var.table_names : t => t } : {}
+  name         = each.value
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = var.partition_key
 
@@ -57,18 +56,20 @@ resource "aws_iam_policy" "lambda_dynamo_policy" {
 
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Effect = "Allow",
-      Action = [
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:Query",
-        "dynamodb:Scan",
-        "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem"
-      ],
-      Resource = var.table_arn != "" ? var.table_arn : "*"
-    }]
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ],
+        Resource = var.table_arns != [] ? var.table_arns : [for t in aws_dynamodb_table.tables : t.arn]
+      }
+    ]
   })
 }
 
@@ -94,7 +95,7 @@ resource "aws_lambda_function" "lambda" {
     variables = merge(
       var.env_vars,
       var.enable_dynamo ? {
-        DYNAMO_TABLE = var.create_table ? aws_dynamodb_table.table[0].name : var.table_name
+        DYNAMO_TABLES = join(",", [for t in aws_dynamodb_table.tables : t.name])
       } : {}
     )
   }
@@ -103,7 +104,6 @@ resource "aws_lambda_function" "lambda" {
 # ----------------------------------------------------------
 # OPTIONAL: API GATEWAY
 # ----------------------------------------------------------
-
 resource "aws_api_gateway_rest_api" "api" {
   count       = var.enable_api ? 1 : 0
   name        = "${var.lambda_name}-api"
