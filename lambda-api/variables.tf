@@ -71,3 +71,8 @@ variable "aws_region" {
   type    = string
   default = "us-east-1"
 }
+variable "zip_hash" {
+  description = "SHA256 hash of the Lambda zip to trigger redeploy"
+  type        = string
+  default     = ""
+}

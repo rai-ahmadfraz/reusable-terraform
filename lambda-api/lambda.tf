@@ -15,4 +15,5 @@ resource "aws_lambda_function" "lambda" {
       } : {}
     )
   }
+  source_code_hash = var.zip_hash
 }

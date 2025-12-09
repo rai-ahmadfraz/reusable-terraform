@@ -12,7 +12,7 @@ data "archive_file" "lambda_zip" {
 module "serverless_app" {
   source = "../lambda-api"
   # source = "git::https://github.com/rai-ahmadfraz/reusable-terraform.git//lambda-api?ref=main"
-  lambda_name   = "testnewlambda"
+  lambda_name   = "applefn"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   package_path  = data.archive_file.lambda_zip.output_path
@@ -20,7 +20,7 @@ module "serverless_app" {
   aws_region    = var.aws_region
 
   enable_dynamo  = true
-  table_names    = ["testtable1", "testtable2"]
+  table_names    = ["appletb1", "appletb2"]
 
   enable_api     = true
   endpoints = [
@@ -28,4 +28,5 @@ module "serverless_app" {
     { method = "GET",  path = "list" },
     { method = "DELETE", path = "delete" }
   ]
+  zip_hash = filesha256(data.archive_file.lambda_zip.output_path)
 }
