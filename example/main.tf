@@ -21,12 +21,11 @@ module "serverless_app" {
 
   enable_dynamo  = true
   table_names    = ["appletb1", "appletb2"]
-
+  zip_hash = filesha256(data.archive_file.lambda_zip.output_path)
   enable_api     = true
   endpoints = [
     { method = "POST", path = "create" },
     { method = "GET",  path = "list" },
     { method = "DELETE", path = "delete" }
   ]
-  zip_hash = filesha256(data.archive_file.lambda_zip.output_path)
 }
