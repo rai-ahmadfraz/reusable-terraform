@@ -76,3 +76,52 @@ variable "zip_hash" {
   type        = string
   default     = ""
 }
+
+# COGNITO
+variable "enable_cognito" {
+  type    = bool
+  default = false
+}
+
+variable "cognito_user_pool_name" {
+  type    = string
+  default = null
+}
+
+variable "cognito_app_client_name" {
+  type    = string
+  default = null
+}
+
+
+# SNS
+variable "enable_sns" {
+  type    = bool
+  default = false
+  description = "Whether to create SNS topic"
+}
+
+variable "sns_topic_name" {
+  type    = string
+  default = ""
+  description = "SNS topic name"
+}
+
+# SQS
+variable "enable_sqs" {
+  type    = bool
+  default = false
+  description = "Whether to create SQS queue"
+}
+
+variable "sqs_queue_name" {
+  type    = string
+  default = ""
+  description = "SQS queue name"
+}
+# SNS to SQS Subscription
+variable "subscribe_sqs_to_sns" {
+  type    = bool
+  default = false
+  description = "Whether to subscribe the SQS queue to the SNS topic"
+}
